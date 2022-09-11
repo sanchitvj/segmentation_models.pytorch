@@ -10,7 +10,7 @@ __all__ = ["TverskyLoss"]
 
 class TverskyLoss(DiceLoss):
     """Tversky loss for image segmentation task.
-    Where FP and FN is weighted by alpha and beta params.
+    Where TP and FP is weighted by alpha and beta params.
     With alpha == beta == 0.5, this loss becomes equal DiceLoss.
     It supports binary, multiclass and multilabel cases
 
@@ -24,7 +24,7 @@ class TverskyLoss(DiceLoss):
         ignore_index: Label that indicates ignored pixels (does not contribute to loss)
         eps: Small epsilon for numerical stability
         alpha: Weight constant that penalize model for FPs (False Positives)
-        beta: Weight constant that penalize model for FNs (False Negatives)
+        beta: Weight constant that penalize model for FNs (False Positives)
         gamma: Constant that squares the error function. Defaults to ``1.0``
 
     Return:

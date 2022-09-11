@@ -66,10 +66,6 @@ class FPN(SegmentationModel):
     ):
         super().__init__()
 
-        # validate input params
-        if encoder_name.startswith("mit_b") and encoder_depth != 5:
-            raise ValueError("Encoder {} support only encoder_depth=5".format(encoder_name))
-
         self.encoder = get_encoder(
             encoder_name,
             in_channels=in_channels,

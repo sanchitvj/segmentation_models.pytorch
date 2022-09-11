@@ -6,7 +6,7 @@ import torch.nn as nn
 from timm.models.efficientnet import EfficientNet
 from timm.models.efficientnet import decode_arch_def, round_channels, default_cfgs
 from timm.models.layers.activations import Swish
-
+from timm.models.efficientnet_builder import resolve_bn_args, resolve_act_layer
 from ._base import EncoderMixin
 
 
@@ -91,6 +91,35 @@ def gen_efficientnet_lite_kwargs(channel_multiplier=1.0, depth_multiplier=1.0, d
     return model_kwargs
 
 
+def gen_efficientnetv2_l_kwargs(channel_multiplier=1.0, depth_multiplier=1.0, **kwargs):
+    """Creates an EfficientNet-V2 Large model
+    Ref impl: https://github.com/google/automl/tree/master/efficientnetv2
+    Paper: `EfficientNetV2: Smaller Models and Faster Training` - https://arxiv.org/abs/2104.00298
+    """
+
+    arch_def = [
+        ["cn_r4_k3_s1_e1_c32_skip"],
+        ["er_r7_k3_s2_e4_c64"],
+        ["er_r7_k3_s2_e4_c96"],
+        ["ir_r10_k3_s2_e4_c192_se0.25"],
+        ["ir_r19_k3_s1_e6_c224_se0.25"],
+        ["ir_r25_k3_s2_e6_c384_se0.25"],
+        ["ir_r7_k3_s1_e6_c640_se0.25"],
+    ]
+
+    model_kwargs = dict(
+        block_args=decode_arch_def(arch_def, depth_multiplier),
+        num_features=1280,
+        stem_size=32,
+        round_chs_fn=partial(round_channels, multiplier=channel_multiplier),
+        norm_layer=kwargs.pop("norm_layer", None) or partial(nn.BatchNorm2d, **resolve_bn_args(kwargs)),
+        act_layer=resolve_act_layer(kwargs, "silu"),
+        **kwargs,
+    )
+    #     model = _create_effnet(variant, pretrained, **model_kwargs)
+    return model_kwargs  # model
+
+
 class EfficientNetBaseEncoder(EfficientNet, EncoderMixin):
     def __init__(self, stage_idxs, out_channels, depth=5, **kwargs):
         super().__init__(**kwargs)
@@ -142,6 +171,21 @@ class EfficientNetEncoder(EfficientNetBaseEncoder):
         super().__init__(stage_idxs, out_channels, depth, **kwargs)
 
 
+class EfficientNetV2Encoder(EfficientNetBaseEncoder):
+    def __init__(
+        self,
+        stage_idxs,
+        out_channels,
+        depth=5,
+        channel_multiplier=1.0,
+        depth_multiplier=1.0,
+        drop_rate=0.2,
+    ):
+        # NOTE: Don't pass kwargs as an argument in below function to avoid state dict error
+        kwargs = gen_efficientnetv2_l_kwargs(channel_multiplier, depth_multiplier)
+        super().__init__(stage_idxs, out_channels, depth, **kwargs)
+
+
 class EfficientNetLiteEncoder(EfficientNetBaseEncoder):
     def __init__(
         self,
@@ -167,6 +211,21 @@ def prepare_settings(settings):
 
 
 timm_efficientnet_encoders = {
+    "timm-efficientnetv2-l-in21ft1k": {
+        "encoder": EfficientNetV2Encoder,
+        "pretrained_settings": {
+            "imagenet": prepare_settings(default_cfgs["tf_efficientnetv2_l_in21ft1k"]),
+            # "advprop": prepare_settings(default_cfgs["tf_efficientnet_b0_ap"]),
+            # "noisy-student": prepare_settings(default_cfgs["tf_efficientnet_b0_ns"]),
+        },
+        "params": {
+            "out_channels": (3, 32, 64, 96, 224, 640),
+            "stage_idxs": (2, 3, 5),
+            "channel_multiplier": 1.0,  # 1.6,
+            "depth_multiplier": 1.0,  # 2.2,
+            "drop_rate": 0.4,
+        },
+    },
     "timm-efficientnet-b0": {
         "encoder": EfficientNetEncoder,
         "pretrained_settings": {
